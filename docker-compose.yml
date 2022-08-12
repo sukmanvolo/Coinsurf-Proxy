@@ -1,0 +1,77 @@
+version: '3.5'
+
+services:
+  accountant:
+    container_name: accountant
+    image: accountant:latest
+    depends_on:
+      - postgres
+      - redis
+      - clickhouse
+    env_file:
+      - ${PWD}/accountant.env
+    restart: always
+
+  proxy:
+    container_name: proxy
+    image: proxy:latest
+    depends_on:
+      - redis
+      - accountant
+    env_file:
+      - ${PWD}/proxy.env
+    ports:
+      - "8080:8080/udp"
+      - "8080:8080/tcp"
+      - "8282:8282/udp"
+      - "7070:7070/tcp"
+      - "5555:5555/tcp"
+    cap_add:
+      - SYS_ADMIN
+    ulimits:
+      nofile:
+        soft: 1000000
+        hard: 1000000
+    volumes:
+      - ${PWD}/data/ip2location/ip2location_cities.bin:/app/files/ip2location_cities.bin
+    restart: always
+
+  postgres:
+    container_name: postgres
+    image: postgres:14.3-alpine
+    volumes:
+      - ${PWD}/data/postgres:/var/lib/postgresql/data:Z
+      - ${PWD}/data/backup:/backups:z
+    env_file:
+      - ${PWD}/api.env
+    ports:
+      - "5432:5432/tcp"
+    restart: unless-stopped
+
+  redis:
+    container_name: redis
+    image: redis:7.0.2-alpine
+    command: redis-server --requirepass ASJKDhkj1231JASDHjahsdjNOTHACKABLEJSADhjsak
+    volumes:
+      - ${PWD}/data/redis:/data
+    ports:
+      - "6379:6379/tcp"
+    restart: always
+
+  clickhouse:
+    container_name: clickhouse
+    image: clickhouse/clickhouse-server:22.5-alpine
+    volumes:
+      - ${PWD}/config/clickhouse/users.xml:/etc/clickhouse-server/users.xml
+      - ${PWD}/data/clickhouse/data:/opt/clickhouse/data
+    ports:
+      - "8123:8123/tcp"
+      - "9000:9000/tcp"
+    cap_add:
+      - NET_ADMIN
+      - SYS_NICE
+      - IPC_LOCK
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
